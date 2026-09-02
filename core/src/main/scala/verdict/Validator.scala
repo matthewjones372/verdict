@@ -1,17 +1,22 @@
 package verdict
 
 enum ValidationError:
-  case BadPath(override val path: FieldPath, error: PathError)
-  case WrongType(override val path: FieldPath, operator: String, expected: FieldType, actual: FieldType)
+  case BadPath(path: FieldPath, error: PathError)
+  case WrongType(path: FieldPath, operator: String, expected: FieldType, actual: FieldType)
 
-  def path: FieldPath = this match
-    case BadPath(p, _)         => p
-    case WrongType(p, _, _, _) => p
+  /** A stored rule that will not parse has no path to point at. */
+  case Unreadable(reason: String)
+
+  def at: Option[FieldPath] = this match
+    case BadPath(p, _)         => Some(p)
+    case WrongType(p, _, _, _) => Some(p)
+    case Unreadable(_)         => None
 
   def message: String = this match
     case BadPath(path, error) => error.message(path)
     case WrongType(path, operator, expected, actual) =>
       s"${path.render}: $operator needs a ${expected.render} field, but ${path.render} is a ${actual.render}"
+    case Unreadable(reason) => s"this is not a stored rule: $reason"
 
 object Validator:
 

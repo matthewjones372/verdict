@@ -75,7 +75,7 @@ object ValidationSpec extends ZIOSpecDefault:
       val errors = Validator.validate(rule, Schema.of[Trade])
       assertTrue(
         errors.length == 3,
-        errors.map(_.path.render) == List("currency", "nope", "notional")
+        errors.flatMap(_.at).map(_.render) == List("currency", "nope", "notional")
       )
     },
     test("a rule that fails validation also fails to evaluate, on the same path") {
