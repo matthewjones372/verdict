@@ -1,5 +1,9 @@
 package verdict
 
+import scala.compiletime.{constValue, erasedValue, error, summonFrom}
+import scala.compiletime.ops.any.==
+import scala.deriving.Mirror
+
 /** What a record's fields are called and what shape they have. */
 enum FieldType:
   case Text, Number, Bool
@@ -88,6 +92,67 @@ final case class Schema[A](typeName: String, fields: List[Field]):
         }
         .mkString("\n")
     s"$typeName\n${go(this, "  ")}"
+
+object Schema:
+
+  /** Derives a schema from the definition of `A`, so that nobody maintains a
+    * field list by hand and nobody can forget to update one.
+    *
+    * The annotation set is empty here. `Mirror` does not carry annotations, so
+    * reading them needs a `quotes.reflect` macro, which cannot live in the same
+    * compilation unit as its use sites; see `verdict.macros.Annotated`.
+    */
+  inline def derived[A](using m: Mirror.ProductOf[A]): Schema[A] =
+    Schema[A](
+      constValue[m.MirroredLabel],
+      fieldsOf[m.MirroredElemLabels, m.MirroredElemTypes, m.MirroredLabel *: EmptyTuple]
+    )
+
+  inline def of[A](using schema: Schema[A]): Schema[A] = schema
+
+  private inline def fieldsOf[Labels <: Tuple, Types <: Tuple, Seen <: Tuple]: List[Field] =
+    inline erasedValue[Types] match
+      case _: EmptyTuple => Nil
+      case _: (t *: ts) =>
+        inline erasedValue[Labels] match
+          // Mirror guarantees the two tuples have the same arity, so the
+          // EmptyTuple case here is unreachable; it exists to keep the match
+          // exhaustive.
+          case _: EmptyTuple => Nil
+          case _: (l *: ls) =>
+            Field(constValue[l & String], fieldTypeOf[t, Seen], Set.empty) :: fieldsOf[ls, ts, Seen]
+
+  private inline def fieldTypeOf[T, Seen <: Tuple]: FieldType =
+    summonFrom {
+      case leaf: Leaf[T] => leaf.fieldType
+      case m: Mirror.ProductOf[T] =>
+        cycleCheck[m.MirroredLabel, Seen]
+        FieldType.Nested(
+          Schema[T](
+            constValue[m.MirroredLabel],
+            fieldsOf[m.MirroredElemLabels, m.MirroredElemTypes, m.MirroredLabel *: Seen]
+          )
+        )
+      case _ =>
+        error(
+          "verdict: cannot derive a Schema for this field. A field must be a String, BigDecimal, Int, Long or Boolean, or a case class whose fields are."
+        )
+    }
+
+  /** A recursive record would inline forever, because the derivation unfolds
+    * the type rather than tying a knot at runtime. `Seen` carries the labels
+    * already being unfolded so the expansion stops with a message instead of
+    * with a stack overflow.
+    */
+  private inline def cycleCheck[Label, Seen <: Tuple]: Unit =
+    inline erasedValue[Seen] match
+      case _: EmptyTuple => ()
+      case _: (h *: t) =>
+        inline if constValue[h == Label] then
+          error(
+            "verdict: this record type is recursive, and a schema is a finite description. Break the cycle, or describe the recursive part as a leaf."
+          )
+        else cycleCheck[Label, t]
 
 enum PathError:
   case Unknown(segment: String, in: String, available: List[String])
