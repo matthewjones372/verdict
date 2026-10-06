@@ -4,9 +4,9 @@ A rules engine for Scala 3 where a rule is a value rather than a compiled
 predicate. The same rule can be evaluated, explained, compiled to SQL, checked
 against a record type, and asked what fields it reads.
 
-The AST has no case holding a function. That is the constraint everything else
-rests on: a node holding a `Trade => Boolean` would make the rest of the rule
-invisible to validation, to the SQL interpreter, and to anyone reading it.
+The AST has no case holding a function. A node holding a `Trade => Boolean`
+would hide that part of the rule from validation, from the SQL interpreter, and
+from anyone reading it, so everything else depends on that restriction.
 
 ## The two authoring routes
 
@@ -21,10 +21,10 @@ val r: Rule = rule[Trade] { t =>
 ```
 
 The lambda is never run. A macro reads it, checks each field path against the
-record type, and produces the AST. Anything outside the understood subset —
-`&&`, `||`, `!`, the comparisons against a numeric literal, `==` against a
-string literal, `Set(...).contains(field)`, and a boolean field on its own — is
-a compile error naming the expression and listing what can be said.
+record type, and produces the AST. The supported subset is `&&`, `||`, `!`,
+comparisons against a numeric literal, `==` against a string literal,
+`Set(...).contains(field)`, and a boolean field on its own. Anything else is a
+compile error that names the expression and lists what is supported.
 
 Or it can be loaded from JSON:
 
@@ -40,10 +40,9 @@ Or it can be loaded from JSON:
 RuleJson.load(document, Schema.of[Trade]): Either[List[ValidationError], Rule]
 ```
 
-Both produce the same `Rule`. JSON is the persistence format, not an authoring
-format: nobody should be hand-writing that document. Authoring is the macro, or
-a UI built over the derived schema — the schema already knows the field names,
-their types and their tags, which is everything such a UI needs.
+Both produce the same `Rule`. JSON is for storage, not for writing rules by
+hand. Rules are written with the macro, or through a UI built over the derived
+schema, which already has the field names, their types and their tags.
 
 ## A worked example
 
@@ -102,7 +101,7 @@ T-3 matches
         FAIL isCleared (false) is true
 ```
 
-## How it holds together
+## How it works
 
 `Schema.derived` reads the case class through `Mirror.ProductOf`, so nobody
 maintains a field list. `@Sensitive` and `@Identity` are read by a separate
@@ -116,9 +115,9 @@ The in-memory evaluator and the generated SQL are two implementations of the
 same rule, so they are checked against each other: random trades go into H2, and
 for a set of rules both sides must select exactly the same records. Half the
 generated notionals are drawn from the constants the rules compare against,
-because a purely random decimal never lands on a boundary — with those values a
-`>` compiled as `>=` fails the test and shrinks to a single trade sitting on the
-boundary.
+because a purely random decimal almost never lands exactly on a boundary. With
+those values, a `>` compiled as `>=` fails the test and shrinks to a single trade
+sitting on the boundary.
 
 ## When not to use this
 
@@ -130,7 +129,7 @@ explainability and multiple interpreters. That trade is a loss when:
 - engineers are the only audience, so "why did this match?" is answered by
   reading the code or a log line;
 - nothing outside the service needs the same rule, so there is no second
-  interpreter to keep honest;
+  interpreter;
 - the rules never change without a deploy, so storing them buys nothing.
 
 The cost is worth paying when a non-engineer has to see why a record matched,
@@ -139,19 +138,19 @@ rules change on a different schedule from the code.
 
 ## Prior art
 
-The `Evidence` tree and the phase 7 macro are the same mechanism ZIO Test uses
-for `assertTrue`: an assertion written as ordinary Scala is intercepted by a
+The `Evidence` tree and the `rule` macro use the same idea as ZIO Test's
+`assertTrue`: an assertion written as ordinary Scala is intercepted by a
 macro and reified into composable `TestArrow` values, which is why a failure can
 report the parts of the expression rather than just `false`. This library
 applies that idea to business rules instead of test assertions.
 
 ## Layout
 
-- `core` — the AST, the schema types and every interpreter. No macros, no
+- `core`: the AST, the schema types and every interpreter. No macros, no
   dependencies.
-- `macros` — the annotation reader and the `rule[A] { ... }` macro. A macro
+- `macros`: the annotation reader and the `rule[A] { ... }` macro. A macro
   cannot be expanded in the compilation unit that defines it, so this is its own
   subproject.
-- `tests` — the specs, the differential test, and the demo main.
+- `tests`: the specs, the differential test, and the demo main.
 
 `sbt test` runs everything.
