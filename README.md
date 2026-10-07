@@ -119,6 +119,31 @@ because a purely random decimal almost never lands exactly on a boundary. With
 those values, a `>` compiled as `>=` fails the test and shrinks to a single trade
 sitting on the boundary.
 
+## Using it
+
+verdict is not published to a repository yet. Build it into your local Ivy
+repository and depend on the snapshot:
+
+```sh
+sbt publishLocal
+```
+
+```scala
+libraryDependencies += "dev.verdict" %% "verdict-core" % "0.1.0-SNAPSHOT"
+// and for authoring rules as Scala:
+libraryDependencies += "dev.verdict" %% "verdict-macros" % "0.1.0-SNAPSHOT"
+```
+
+## Used in
+
+[tweet-street](https://github.com/matthewjones372/tweet-street)'s
+[bank-checks](https://github.com/matthewjones372/tweet-street/tree/main/bank-checks)
+service uses it in all three of the ways above. An admin writes screening and
+monitoring rules in a web wizard built over a derived `Schema`. Screening
+evaluates each transfer against the current rules before money moves, and
+monitoring compiles its rules to SQL with `SqlInterpreter` to find movements
+that need a flag.
+
 ## When not to use this
 
 If you have one filter in one service, write the `if`. This library costs you an
@@ -154,3 +179,7 @@ applies that idea to business rules instead of test assertions.
 - `tests`: the specs, the differential test, and the demo main.
 
 `sbt test` runs everything.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
