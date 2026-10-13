@@ -6,6 +6,23 @@ ThisBuild / scalaVersion := scala3
 ThisBuild / organization := "dev.verdict"
 ThisBuild / version      := "0.1.0-SNAPSHOT"
 
+// The Scala 3 compiler and scaladoc resolve on this build's scala-tool and scala-doc-tool configurations, and
+// bring jackson 2.15.1, jsoup 1.17.2 and jline 3.27.1, which have open advisories. Only the build runs them.
+val jackson = "2.18.11"
+val jline   = "3.30.17"
+ThisBuild / dependencyOverrides ++= Seq(
+  "com.fasterxml.jackson.core"       % "jackson-core"            % jackson,
+  "com.fasterxml.jackson.core"       % "jackson-databind"        % jackson,
+  "com.fasterxml.jackson.core"       % "jackson-annotations"     % jackson,
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % jackson,
+  "com.fasterxml.jackson.datatype"   % "jackson-datatype-jsr310" % jackson,
+  "org.jsoup"                        % "jsoup"                   % "1.23.2",
+  "org.jline"                        % "jline-reader"            % jline,
+  "org.jline"                        % "jline-terminal"          % jline,
+  "org.jline"                        % "jline-terminal-jni"      % jline,
+  "org.jline"                        % "jline-native"            % jline
+)
+
 // zio-test does not use JUnit, so without this line `sbt test` runs and reports
 // nothing at all rather than failing.
 ThisBuild / testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
